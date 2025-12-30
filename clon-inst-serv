@@ -1,0 +1,250 @@
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <time.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <syslog.h>
+
+#include <openssl/ssl.h>
+#include <openssl/err.h>
+#include <openssl/hmac.h>
+#include <openssl/rand.h>
+
+#define PORT 5555
+#define MAX_PAYLOAD 4096
+#define NONCE_SIZE 16
+#define HMAC_SIZE 32
+#define VERSION_FILE "/var/lib/configd/version"
+#define CONFIG_TMP  "/var/lib/configd/config.new"
+#define CONFIG_DST  "/etc/miapp/config.json"
+
+static uint64_t local_version = 0;
+
+/* 🔐 Clave HMAC (idealmente cargada desde archivo root-only) */
+static uint8_t hmac_key[32] = {
+    0x91,0x23,0x55,0xaa,0x42,0x9f,0x10,0x77,
+    0x19,0x2c,0x88,0xde,0x01,0x11,0x99,0x33,
+    0x45,0x67,0x89,0xab,0xcd,0xef,0x54,0x21,
+    0x66,0x77,0x88,0x99,0xaa,0xbb,0xcc,0xdd
+};
+
+typedef struct {
+    uint64_t version;
+    uint64_t timestamp;
+    uint8_t  nonce[NONCE_SIZE];
+    uint32_t payload_len;
+    uint8_t  payload[MAX_PAYLOAD];
+    uint8_t  hmac[HMAC_SIZE];
+} secure_msg;
+
+/* ───────────────────── Logging ───────────────────── */
+
+static void log_fatal(const char *msg) {
+    syslog(LOG_ERR, "%s: %s", msg, strerror(errno));
+    exit(EXIT_FAILURE);
+}
+
+static void log_warn(const char *msg) {
+    syslog(LOG_WARNING, "%s", msg);
+}
+
+static void log_info(const char *msg) {
+    syslog(LOG_INFO, "%s", msg);
+}
+
+/* ───────────────────── Crypto ───────────────────── */
+
+static void sign_msg(secure_msg *m) {
+    unsigned int len;
+    HMAC(EVP_sha256(),
+         hmac_key, sizeof(hmac_key),
+         (unsigned char *)m,
+         sizeof(*m) - HMAC_SIZE,
+         m->hmac, &len);
+}
+
+static int verify_msg(const secure_msg *m) {
+    uint8_t expected[HMAC_SIZE];
+    unsigned int len;
+
+    HMAC(EVP_sha256(),
+         hmac_key, sizeof(hmac_key),
+         (unsigned char *)m,
+         sizeof(*m) - HMAC_SIZE,
+         expected, &len);
+
+    return CRYPTO_memcmp(expected, m->hmac, HMAC_SIZE) == 0;
+}
+
+/* ───────────────────── TLS ───────────────────── */
+
+static SSL_CTX *init_tls_ctx(int server) {
+    SSL_CTX *ctx = SSL_CTX_new(server ?
+        TLS_server_method() : TLS_client_method());
+
+    if (!ctx)
+        log_fatal("SSL_CTX_new");
+
+    SSL_CTX_set_min_proto_version(ctx, TLS1_3_VERSION);
+    SSL_CTX_use_certificate_file(ctx, "node.crt", SSL_FILETYPE_PEM);
+    SSL_CTX_use_PrivateKey_file(ctx, "node.key", SSL_FILETYPE_PEM);
+    SSL_CTX_load_verify_locations(ctx, "ca.crt", NULL);
+
+    SSL_CTX_set_verify(ctx,
+        SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
+        NULL);
+
+    return ctx;
+}
+
+/* ───────────────────── Versioning ───────────────────── */
+
+static void load_version(void) {
+    FILE *f = fopen(VERSION_FILE, "r");
+    if (f) {
+        fscanf(f, "%lu", &local_version);
+        fclose(f);
+    }
+}
+
+static void save_version(void) {
+    FILE *f = fopen(VERSION_FILE, "w");
+    if (!f)
+        log_fatal("save_version");
+    fprintf(f, "%lu\n", local_version);
+    fclose(f);
+}
+
+/* ───────────────────── Config apply ───────────────────── */
+
+static int apply_config(const uint8_t *data, uint32_t len) {
+    int fd = open(CONFIG_TMP, O_CREAT | O_TRUNC | O_WRONLY, 0600);
+    if (fd < 0)
+        return -1;
+
+    if (write(fd, data, len) != (ssize_t)len) {
+        close(fd);
+        return -1;
+    }
+
+    fsync(fd);
+    close(fd);
+
+    if (rename(CONFIG_TMP, CONFIG_DST) < 0)
+        return -1;
+
+    system("systemctl reload miapp");
+    return 0;
+}
+
+/* ───────────────────── Server ───────────────────── */
+
+static void handle_client(SSL *ssl) {
+    secure_msg msg;
+    memset(&msg, 0, sizeof(msg));
+
+    if (SSL_read(ssl, &msg, sizeof(msg)) != sizeof(msg)) {
+        log_warn("Lectura incompleta");
+        return;
+    }
+
+    if (msg.payload_len > MAX_PAYLOAD) {
+        log_warn("Payload demasiado grande");
+        return;
+    }
+
+    if (!verify_msg(&msg)) {
+        log_warn("HMAC inválido");
+        return;
+    }
+
+    time_t now = time(NULL);
+    if (llabs((long long)(now - msg.timestamp)) > 10) {
+        log_warn("Timestamp fuera de ventana");
+        return;
+    }
+
+    if (msg.version <= local_version) {
+        log_warn("Versión antigua");
+        return;
+    }
+
+    if (msg.version != local_version + 1) {
+        log_warn("Salto de versión sospechoso");
+        return;
+    }
+
+    if (apply_config(msg.payload, msg.payload_len) == 0) {
+        local_version = msg.version;
+        save_version();
+        log_info("Configuración aplicada");
+    }
+}
+
+/* ───────────────────── Server loop ───────────────────── */
+
+static void server_loop(void) {
+    SSL_CTX *ctx = init_tls_ctx(1);
+
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0)
+        log_fatal("socket");
+
+    int opt = 1;
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET,
+        .sin_port = htons(PORT),
+        .sin_addr.s_addr = INADDR_ANY
+    };
+
+    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+        log_fatal("bind");
+
+    listen(sock, 10);
+    log_info("configd escuchando");
+
+    while (1) {
+        int client = accept(sock, NULL, NULL);
+        if (client < 0)
+            continue;
+
+        SSL *ssl = SSL_new(ctx);
+        SSL_set_fd(ssl, client);
+
+        if (SSL_accept(ssl) > 0)
+            handle_client(ssl);
+
+        SSL_shutdown(ssl);
+        SSL_free(ssl);
+        close(client);
+    }
+}
+
+/* ───────────────────── Main ───────────────────── */
+
+int main(int argc, char **argv) {
+    openlog("configd", LOG_PID | LOG_NDELAY, LOG_DAEMON);
+
+    SSL_library_init();
+    SSL_load_error_strings();
+
+    load_version();
+
+    if (argc != 2 || strcmp(argv[1], "server") != 0) {
+        fprintf(stderr, "Uso: %s server\n", argv[0]);
+        exit(EXIT_FAILURE);
+    }
+
+    server_loop();
+    return 0;
+}
