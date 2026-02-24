@@ -19,27 +19,27 @@ def setup():
     print("=== INICIANDO DESPLIEGUE DEL SERVIDOR ===\n")
 
     if not os.path.exists(DEST_DIR):
-        run_command(f"git clone {REPO_URL} {DEST_DIR}", "Clonando repositorio")
+        run_command(f"git clone {REPO_URL} {DEST_DIR}", "Clonando del repositorio en proceso.")
     else:
-        print("[!] El directorio de destino ya existe. Saltando clonación.")
+        print("[!] El directorio de destino ya existe. Omitiendo clonación.")
 
     os.chdir(DEST_DIR)
 
     if not os.path.exists(ENV_REAL):
         if os.path.exists(ENV_EXAMPLE):
             shutil.copy(ENV_EXAMPLE, ENV_REAL)
-            print("[+] Archivo .env creado. ¡RECUERDA EDITARLO!")
+            print("[+] Archivo .env creado. Recuerde editarlo.")
         else:
             with open(ENV_REAL, "w") as f:
                 f.write("DB_USER=admin\nDB_PASS=cambiame\nPORT=8080")
             print("[+] Archivo .env generado desde cero.")
 
-    # run_command("pip install -r requirements.txt", "Instalando dependencias")
+    # run_command("pip install -r requirements.txt", "Instalando dependencias.")
 
-    run_command("chmod +x *.sh", "Dando permisos de ejecución a scripts")
+    run_command("chmod +x *.sh", "Dando permisos de ejecución a scripts.")
 
     print("\n[OK] Configuración completada con éxito.")
-    print(f"Próximo paso: Edita {DEST_DIR}/{ENV_REAL} y arranca tu servidor.")
+    print(f"Próximo paso: edite {DEST_DIR}/{ENV_REAL} y arranque el servidor.")
 
 if __name__ == "__main__":
     setup()
