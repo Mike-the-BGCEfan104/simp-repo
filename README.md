@@ -1,18 +1,20 @@
-# Mikes-repository
-Para el proyecto de fin de grado
+# Mike's Repository
+Proyecto para el Trabajo de Fin de Grado (TFG)
 
-## Despliegue y Clonación Rápida
+Este repositorio contiene la configuración y los scripts necesarios para el despliegue de un servidor automatizado. Está diseñado bajo el principio de **Self-Contained Repo**, facilitando la clonación y replicación idéntica entre distintos entornos de servidor.
 
-Este repositorio está diseñado para ser clonado y configurado automáticamente en distintos servidores. Sigue estos pasos para un despliegue consistente:
+
+## 🚀 Despliegue y Clonación Rápida
+
+Este proyecto utiliza un script de orquestación en Python para asegurar la réplica correcta de la configuración, gestionando permisos y variables de entorno de forma automática.
 
 ### 1. Requisitos Previos
-Asegúrate de tener instalados los siguientes paquetes en tu servidor Linux:
-`git`
-`python3`
+Antes de comenzar, se deben tener instalados los siguientes paquetes en tu servidor Linux:
+* `git`
+* `python3`
 
 ### 2. Instalación Automática
-Ejecuta el siguiente comando para clonar el repositorio y configurar el entorno (permisos, variables y estructura):
+Se ejecuta el siguiente comando para descargar el script de configuración y desplegar el entorno completo en un solo paso:
 
 ```bash
-curl -O [https://raw.githubusercontent.com/Mike-the-BGCEfan-104/simp-repo/main/self-cont.py](https://raw.githubusercontent.com/Mike-the-BGCEfan-104/simp-repo/main/setup_server.py) && python3 self-cont.py
-
+curl -O [https://raw.githubusercontent.com/Mike-the-BGCEfan104/simp-repo/main/self-cont.py](https://raw.githubusercontent.com/Mike-the-BGCEfan104/simp-repo/main/self-cont.py) && python3 self-cont.py
