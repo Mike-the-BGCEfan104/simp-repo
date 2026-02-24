@@ -4,7 +4,7 @@ Proyecto para el Trabajo de Fin de Grado (TFG)
 Este repositorio contiene la configuración y los scripts necesarios para el despliegue de un servidor automatizado. Está diseñado bajo el principio de **Self-Contained Repo**, facilitando la clonación y replicación idéntica entre distintos entornos de servidor.
 
 
-## 🚀 Despliegue y Clonación Rápida
+## Despliegue y Clonación Rápida
 
 Este proyecto utiliza un script de orquestación en Python para asegurar la réplica correcta de la configuración, gestionando permisos y variables de entorno de forma automática.
 
