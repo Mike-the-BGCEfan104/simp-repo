@@ -9,7 +9,7 @@ Este repositorio contiene la configuración y los scripts necesarios para el des
 Este proyecto utiliza un script de orquestación en Python para asegurar la réplica correcta de la configuración, gestionando permisos y variables de entorno de forma automática.
 
 ### 1. Requisitos Previos
-Antes de comenzar, se deben tener instalados los siguientes paquetes en tu servidor Linux:
+Antes de comenzar, se deben tener instalados los siguientes paquetes en el servidor Linux:
 * `git`
 * `python3`
 
