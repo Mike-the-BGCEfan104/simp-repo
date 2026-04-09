@@ -34,7 +34,7 @@ def setup():
                 f.write("DB_USER=admin\nDB_PASS=cambiame\nPORT=8080")
             print("[+] Archivo .env generado desde cero.")
 
-    # run_command("pip install -r requirements.txt", "Instalando dependencias.")
+    run_command("pip install -r requirements.txt", "Instalando dependencias.")
 
     run_command("chmod +x *.sh", "Dando permisos de ejecución a scripts.")
 
@@ -43,3 +43,33 @@ def setup():
 
 if __name__ == "__main__":
     setup()
+
+
+
+
+def setup_watchdog_instant_sync():
+    print("\n=== Configurando clonación instantánea utilizando un watchdog ===")
+    
+    try:
+        subprocess.run(["apt-get", "update", "-qq"], check=True)
+        subprocess.run(["apt-get", "install", "-y", "rsync", "python3-pip"], check=True)
+        subprocess.run(["pip3", "install", "--upgrade", "watchdog"], check=True)
+
+        
+        subprocess.run(["cp", "/root/simp-repo/instant_sync.py", "/usr/local/bin/instant-sync"], check=True)
+        subprocess.run(["chmod", "+x", "/usr/local/bin/instant-sync"], check=True)
+
+        print("Clonación instantánea configurada correctamente.")
+        print("\nComandos disponibles:")
+        print("   instant-sync init      → Primera sincronización completa")
+        print("   instant-sync start     → Iniciar sincronización en tiempo real")
+        print("\nRecomendación: Ejecutar 'instant-sync start' dentro de screen o tmux.")
+    except Exception as e:
+        print(f"Error al configurar sincronización instantánea: {e}")
+
+
+# Llamada final
+if __name__ == "__main__":
+
+
+    setup_watchdog_instant_sync() #Realmente el que ejecuta
