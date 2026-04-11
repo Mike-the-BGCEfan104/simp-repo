@@ -1,21 +1,47 @@
 #!/usr/bin/env python3
 
-import time
-import subprocess #Importaciones
+import time #Esta sección es de importaciones
+import subprocess
 import sys
-from watchdog.observers import Observer #Fragmento observador
-from watchdog.events import FileSystemEventHandler #Gestiona eventos
+import socket
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
-# Ajustes
-SYNC_DIR = "/var/www/mi-aplicacion"                    # Cambia por tu directorio real
-SLAVE_IPS = ["", ""]           # ¡¡¡¡¡¡¡AÑADIR DIRECCIONES IP ESCLAVAS!!!!!!! ¡¡¡¡¡¡¡POR AHORA EN BLANCO!!!!!!!
+# ==================== CONFIGURACIÓN ====================
+SYNC_DIR = "/var/www/mi-aplicacion" #Cambiar x real
 SSH_USER = "root"
-EXCLUDE_PATTERNS = [
-    "*.log", "*.tmp", "*.pyc", "__pycache__/",
-    ".cache/", "tmp/", "*.swp", ".git/", ".env"
-]
+BROADCAST_PORT = 5000 #Pto broadcast 
+EXCLUDE_PATTERNS = ["*.log", "*.tmp", "*.pyc", "__pycache__/", ".cache/", "tmp/"]
 
-RSYNC_OPTIONS = ["-avz", "--delete", "--quiet"]  #Opciones de resincronización
+RSYNC_OPTIONS = ["-avz", "--delete", "--quiet"]
+
+# Lista dinámica de slaves (a actualizar mediante broadcast)
+SLAVE_IPS = set()
+
+def discover_slaves(): #Escucha de slaves
+    """Envía broadcast y escucha respuestas de otros servidores"""
+    global SLAVE_IPS
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        s.settimeout(2)
+
+        message = b"SLAVE_DISCOVER"
+        s.sendto(message, ('<broadcast>', BROADCAST_PORT))
+
+        while True:
+            try:
+                data, addr = s.recvfrom(1024)
+                if data == b"SLAVE_RESPONSE" and addr[0] != socket.gethostbyname(socket.gethostname()):
+                    SLAVE_IPS.add(addr[0])
+            except socket.timeout:
+                break
+    except:
+        pass
+    finally:
+        s.close()
+
+    print(f"Slaves detectados por broadcast: {list(SLAVE_IPS) or 'Ninguno'}") #Msg detección 
 
 class SyncHandler(FileSystemEventHandler):
     def __init__(self):
@@ -25,40 +51,44 @@ class SyncHandler(FileSystemEventHandler):
     def on_any_event(self, event):
         if event.is_directory:
             return
-        current_time = time.time()
-        if current_time - self.last_sync < self.cooldown:
+        if time.time() - self.last_sync < self.cooldown:
             return
 
-        print(f"[SYNC] Cambio detectado → {event.event_type}: {event.src_path}") #Mensaje a imprimir si hay cambios
+        print(f"[SYNC] Cambio detectado → {event.event_type}: {event.src_path}")
         self.sync_to_all_slaves()
-        self.last_sync = current_time
+        self.last_sync = time.time()
 
     def sync_to_all_slaves(self):
+        if not SLAVE_IPS:
+            print("[SYNC] No se han detectado esclavos")
+            return
+
         exclude_args = [f"--exclude={p}" for p in EXCLUDE_PATTERNS]
-        for ip in SLAVE_IPS:
+        for ip in list(SLAVE_IPS):
             try:
-                cmd = [ #Ejecuta en CMD
+                cmd = [
                     "rsync", *RSYNC_OPTIONS, *exclude_args,
                     "-e", f"ssh -o StrictHostKeyChecking=no -o BatchMode=yes",
                     f"{SYNC_DIR}/",
                     f"{SSH_USER}@{ip}:{SYNC_DIR}/"
                 ]
-                subprocess.run(cmd, check=True, timeout=60) #Subproceso de verificación de sincronización
-                print(f"[SYNC] Sincronizado a {ip}")
+                subprocess.run(cmd, check=True, timeout=60)
+                print(f" Sincronizado a {ip}")
             except Exception as e:
-                print(f"[ERROR] Fallo con {ip}: {e}")
+                print(f" Fallo con {ip}: {e}")
 
 
-def initial_sync(): #Sincronización inicial
+def initial_sync():
+    discover_slaves()
     print("Realizando sincronización inicial...")
     SyncHandler().sync_to_all_slaves()
-    print("Sincronización inicial completada.")
+    print("Inicial completada.")
 
 
-def start_realtime(): #Realmente la clonación instantánea
-    print(f" Iniciando clonación instantánea en {SYNC_DIR}")
-    print(f" Destinos: {', '.join(SLAVE_IPS)}")
-    print(" (Ctrl+C para detener)\n")
+def start_realtime():
+    discover_slaves()
+    print(f" Iniciando clonación instantánea en {SYNC_DIR} (broadcast activado)")
+    print(" (Utiliza CTRL+C para detener)\n")
 
     event_handler = SyncHandler()
     observer = Observer()
@@ -69,7 +99,7 @@ def start_realtime(): #Realmente la clonación instantánea
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n Deteniendo sincronización...")
+        print("\nDeteniendo...")
     finally:
         observer.stop()
         observer.join()
@@ -82,5 +112,5 @@ if __name__ == "__main__":
         start_realtime()
     else:
         print("Uso:")
-        print("  python3 instant_sync.py init    → Sincronización inicial")
-        print("  python3 instant_sync.py start   → Modo tiempo real")
+        print("  python3 instant_sync.py init    → Sincronización inicial + broadcast")
+        print("  python3 instant_sync.py start   → Modo tiempo real con broadcast")
