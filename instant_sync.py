@@ -7,19 +7,16 @@ import socket
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# ==================== CONFIGURACIÓN ====================
-SYNC_DIR = "/var/www/mi-aplicacion" #Cambiar x real
+SYNC_DIR = "/var/www/mi-aplicacion"
 SSH_USER = "root"
-BROADCAST_PORT = 5000 #Pto broadcast 
+BROADCAST_PORT = 5000
 EXCLUDE_PATTERNS = ["*.log", "*.tmp", "*.pyc", "__pycache__/", ".cache/", "tmp/"]
 
 RSYNC_OPTIONS = ["-avz", "--delete", "--quiet"]
 
-# Lista dinámica de slaves (a actualizar mediante broadcast)
 SLAVE_IPS = set()
 
-def discover_slaves(): #Escucha de slaves
-    """Envía broadcast y escucha respuestas de otros servidores"""
+def discover_slaves():
     global SLAVE_IPS
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
