@@ -8,12 +8,17 @@ Este repositorio contiene la configuración y los scripts necesarios para el des
 
 Este proyecto utiliza un script de orquestación en Python para asegurar la réplica correcta de la configuración, gestionando permisos y variables de entorno de forma automática.
 
-### 1. Requisitos Previos
+### Requisitos previos
 Antes de comenzar, se deben tener instalados los siguientes paquetes en el servidor Linux:
-* `git`
-* `python3`
+- git
+- python3
+- rsync (con obligatoriedad de tenerlo en servidor)
+Instalación de dependencias: pip3 install -r requirements.txt
+Uso de clonación instantánea:
+- En el servidor master: python3 instant_sync.py init, python3 instant_sync.py start
+- En cada servidor slave: python3 instant_sync.py slave (Se recomienda ejecutar el slave en background con screen o systemd)
 
-### 2. Instalación Automática
+### Instalación automática
 Se ejecuta el siguiente comando para descargar el script de configuración y desplegar el entorno completo en un solo paso:
 
 ```bash
