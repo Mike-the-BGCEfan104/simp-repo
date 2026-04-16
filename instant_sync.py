@@ -5,8 +5,7 @@ import socket
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-SYNC_DIRS = ["/var/www/mi-aplicacion", "/opt/otra-carpeta"]  
-SSH_USER = "syncuser"
+SYNC_DIRS = ["/var/www/mi-aplicacion", "/opt/otra-carpeta"]
 BROADCAST_PORT = 5000
 EXCLUDE_PATTERNS = ["*.log", "*.tmp", "*.pyc", "__pycache__/", ".cache/", "tmp/"]
 RSYNC_OPTIONS = ["-avz", "--delete", "--quiet"]
@@ -59,9 +58,9 @@ class SyncHandler(FileSystemEventHandler):
                 for directory in SYNC_DIRS:
                     cmd = [
                         "rsync", *RSYNC_OPTIONS, *exclude_args,
-                        "-e", f"ssh -o StrictHostKeyChecking=no -o BatchMode=yes",
+                        "-e", "ssh -o StrictHostKeyChecking=no -o BatchMode=yes",
                         f"{directory}/",
-                        f"{SSH_USER}@{ip}:{directory}/"
+                        f"{ip}:{directory}/"
                     ]
                     subprocess.run(cmd, check=True, timeout=60)
                     print(f"[SYNC] Sincronizado {directory} a {ip}")
@@ -72,7 +71,7 @@ def initial_sync():
     discover_slaves()
     print("Realizando sincronización inicial...")
     SyncHandler().sync_to_all_slaves()
-    print("Inicial completada.")
+    print("Sincronización completada.")
 
 def start_realtime():
     discover_slaves()
@@ -93,7 +92,7 @@ def start_realtime():
         observer.join()
 
 def start_slave_responder():
-    print("Iniciando responder broadcast como slave...")
+    print("Iniciando respuesta de broadcast como slave...")
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.bind(('', BROADCAST_PORT))
     while True:
@@ -118,4 +117,4 @@ if __name__ == "__main__":
         print("Uso:")
         print("  python3 instant_sync.py init     → Sincronización inicial")
         print("  python3 instant_sync.py start    → Modo tiempo real (master)")
-        print("  python3 instant_sync.py slave    → Iniciar responder (en esclavos)")
+        print("  python3 instant_sync.py slave    → Iniciar responder (en slaves)")
