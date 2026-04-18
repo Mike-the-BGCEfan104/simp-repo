@@ -23,3 +23,10 @@ Se ejecuta el siguiente comando para descargar el script de configuración y des
 
 ```bash
 curl -O [https://raw.githubusercontent.com/Mike-the-BGCEfan104/simp-repo/main/self-cont.py](https://raw.githubusercontent.com/Mike-the-BGCEfan104/simp-repo/main/self-cont.py) && python3 self-cont.py
+
+Instalación de dependencias:
+pip3 install -r requirements.txt
+Configuración inicial de SSH (una sola vez): en el servidor master ejecuta: ssh-keygen -t ed25519 y ssh-copy-id usuario_actual@IP_DEL_SLAVE
+Repite ssh-copy-id para cada slave. Esto permite conexión sin contraseña.
+Uso de clonación instantánea: en el servidor master: python3 instant_sync.py init y python3 instant_sync.py start
+En cada servidor slave: python3 instant_sync.py slave (Se recomienda ejecutar el slave en background con screen o tmux)
