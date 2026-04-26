@@ -1,0 +1,9 @@
+Source: clonador-instantaneo
+Section: utils
+Priority: optional
+Maintainer: alex <tuceac72@gmail.com>
+Standards-Version: 4.6.2
+
+Package: clonador-instantaneo
+Architecture: all
+Depends: python3
