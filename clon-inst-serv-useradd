@@ -1,3 +1,0 @@
-useradd -r -s /usr/sbin/nologin configd
-mkdir -p /var/lib/configd
-chown configd:configd /var/lib/configd
