@@ -5,7 +5,6 @@ Este repositorio contiene la configuración y los scripts necesarios para el des
 
 
 ## Despliegue y Clonación Rápida
-
 Este proyecto utiliza un script de orquestación en Python para asegurar la réplica correcta de la configuración, gestionando permisos y variables de entorno de forma automática.
 
 ### Requisitos previos
@@ -14,7 +13,8 @@ Antes de comenzar, se deben tener instalados los siguientes paquetes en el servi
 - python3
 - rsync (con obligatoriedad de tenerlo en servidor)
 Instalación de dependencias: pip3 install -r requirements.txt
-Uso de clonación instantánea:
+
+### Uso de clonación instantánea:
 - En el servidor master: python3 instant_sync.py init, python3 instant_sync.py start
 - En cada servidor slave: python3 instant_sync.py slave (Se recomienda ejecutar el slave en background con screen o systemd)
 
